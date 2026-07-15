@@ -3,23 +3,24 @@ import * as Yup from 'yup'
 import clsx from 'clsx'
 import { useFormik } from 'formik'
 import AsyncSelect from 'react-select/async'
-import { login, getSchools } from '../core/_requests'
+import { login, getTenants } from '../core/_requests'
 import { AuthModel } from '../core/_models'
 import { useAuth } from '../core/Auth'
 import { toAbsoluteUrl } from '../../../../_metronic/helpers'
 
 const loginSchema = Yup.object().shape({
   email: Yup.string()
+    .email('Wrong email format')
     .min(3, 'Minimum 3 symbols')
     .max(50, 'Maximum 50 symbols')
-    .required('Email or Mobile Number is required'),
+    .required('Email is required'),
   password: Yup.string()
     .min(3, 'Minimum 3 symbols')
     .max(50, 'Maximum 50 symbols')
     .required('Password is required'),
-  schoolId: Yup.string().when('loginType', {
-    is: (val: any) => val === 'admin' || val === 'student' || val === 'parent',
-    then: (schema) => schema.required('School is required'),
+  companyId: Yup.string().when('loginType', {
+    is: 'admin',
+    then: (schema) => schema.required('Company is required'),
   }),
 })
 
@@ -28,43 +29,49 @@ export interface LoginProps {
 }
 
 export function Login({ isSuperRoute = false }: LoginProps) {
-  // Load saved school from localStorage on initialization
-  const getSavedSchool = () => {
-    const saved = localStorage.getItem('selected_school')
+  // Load saved company from localStorage on initialization
+  const getSavedCompany = () => {
+    const saved = localStorage.getItem('selected_company')
     if (saved) {
       try {
         return JSON.parse(saved)
       } catch (e) {
-        console.error('Failed to parse saved school', e)
+        console.error('Failed to parse saved company', e)
         return null
       }
     }
     return null
   }
 
-  const savedSchool = getSavedSchool()
+  const savedCompany = getSavedCompany()
 
   const [loading, setLoading] = useState(false)
-  const [loginType, setLoginType] = useState<'super_admin' | 'admin' | 'student' | 'parent'>(isSuperRoute ? 'super_admin' : 'admin')
+  const [loginType] = useState<'super_admin' | 'admin'>(isSuperRoute ? 'super_admin' : 'admin')
   const [showPassword, setShowPassword] = useState(false)
-  const [selectedSchoolLogo, setSelectedSchoolLogo] = useState<string | null>(savedSchool?.logo || null)
-  const [selectedSchoolName, setSelectedSchoolName] = useState<string | null>(savedSchool?.name || null)
+  const [selectedCompanyLogo, setSelectedCompanyLogo] = useState<string | null>(savedCompany?.logo || null)
+  const [selectedCompanyName, setSelectedCompanyName] = useState<string | null>(savedCompany?.name || null)
   const { saveAuth, setCurrentUser } = useAuth()
 
-  const loadSchoolOptions = useCallback(async (inputValue: string) => {
+  const loadCompanyOptions = useCallback(async (inputValue: string) => {
     try {
-      const response = await getSchools(1, 10, inputValue, true)
-      if (response?.data?.data?.schools) {
-        return response.data.data.schools.map((school: any) => ({
-          value: school.id,
-          label: `${school.name} (${school.code})`,
-          logo: school.logoPath || null,
-          name: school.name,
+      const response = await getTenants()
+      if (response?.data?.data?.tenants) {
+        const filtered = response.data.data.tenants.filter(
+          (t: any) =>
+            t.name.toLowerCase().includes(inputValue.toLowerCase()) ||
+            t.subdomain.toLowerCase().includes(inputValue.toLowerCase())
+        )
+        return filtered.map((tenant: any) => ({
+          value: tenant.id,
+          label: `${tenant.name} (${tenant.subdomain})`,
+          logo: null,
+          name: tenant.name,
+          subdomain: tenant.subdomain,
         }))
       }
       return []
     } catch (error) {
-      console.error('Error fetching schools', error)
+      console.error('Error fetching tenants/companies', error)
       return []
     }
   }, [])
@@ -73,18 +80,25 @@ export function Login({ isSuperRoute = false }: LoginProps) {
     initialValues: {
       email: '',
       password: '',
-      schoolId: savedSchool?.id || '',
-      loginType: (isSuperRoute ? 'super_admin' : 'admin') as 'super_admin' | 'admin' | 'student' | 'parent',
+      companyId: savedCompany?.id || '',
+      loginType: (isSuperRoute ? 'super_admin' : 'admin') as 'super_admin' | 'admin',
     },
     validationSchema: loginSchema,
     onSubmit: async (values, { setStatus, setSubmitting }) => {
       setLoading(true)
       try {
-        const { data: response } = await login(values.email, values.password, values.loginType, values.schoolId)
+        let subdomain = undefined
+        if (values.loginType === 'admin') {
+          const savedCompany = localStorage.getItem('selected_company')
+          if (savedCompany) {
+            subdomain = JSON.parse(savedCompany).subdomain
+          }
+        }
+        const { data: response } = await login(values.email, values.password, values.loginType, subdomain)
         if (response.success) {
-          const user = response.data.user || response.data.admin || response.data.parent || (response.data.student ? { ...response.data.student, role: 'student' } : undefined)
-          const auth: AuthModel = { api_token: response.data.token, user }
-          saveAuth(auth, response.data.linkedStudents)
+          const user = response.user || response.admin
+          const auth: AuthModel = { api_token: response.token, user }
+          saveAuth(auth, response.linkedStudents)
           if (user) setCurrentUser(user)
         } else {
           saveAuth(undefined)
@@ -92,10 +106,10 @@ export function Login({ isSuperRoute = false }: LoginProps) {
           setSubmitting(false)
           setLoading(false)
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error(error)
         saveAuth(undefined)
-        setStatus('Something went wrong. Please try again.')
+        setStatus(error.response?.data?.error || 'Something went wrong. Please try again.')
         setSubmitting(false)
         setLoading(false)
       }
@@ -108,7 +122,7 @@ export function Login({ isSuperRoute = false }: LoginProps) {
       ...base,
       backgroundColor: 'var(--kt-input-bg)',
       borderColor:
-        formik.touched.schoolId && formik.errors.schoolId
+        formik.touched.companyId && formik.errors.companyId
           ? 'var(--kt-danger)'
           : state.isFocused
             ? 'var(--kt-primary)'
@@ -183,22 +197,22 @@ export function Login({ isSuperRoute = false }: LoginProps) {
       <div className='text-center mb-11'>
         <div className='d-flex justify-content-center mb-5'>
           <img
-            alt={selectedSchoolName || 'apnacampus'}
-            src={selectedSchoolLogo || toAbsoluteUrl('media/logos/apnacampus.svg')}
+            alt={selectedCompanyName || 'apnacampus'}
+            src={selectedCompanyLogo || toAbsoluteUrl('media/logos/apnacampus.svg')}
             style={{
-              height: selectedSchoolLogo ? '160px' : '70px',
+              height: selectedCompanyLogo ? '160px' : '70px',
               width: 'auto',
-              borderRadius: selectedSchoolLogo ? '8px' : '0',
+              borderRadius: selectedCompanyLogo ? '8px' : '0',
               objectFit: 'contain',
               transition: 'all 0.3s ease',
             }}
           />
         </div>
         <h1 className='text-gray-900 fw-bolder mb-2' style={{ fontSize: '1.9rem', letterSpacing: '-0.5px' }}>
-          {selectedSchoolName ? selectedSchoolName : 'Welcome back'}
+          {selectedCompanyName ? selectedCompanyName : 'Sign In'}
         </h1>
         <div className='text-gray-500 fw-semibold fs-6'>
-          {selectedSchoolName ? 'School Admin Portal' : 'apnacampus School Portal'}
+          {selectedCompanyName ? 'Company Admin Portal' : 'apnacampus Multi-Tenant Company Portal'}
         </div>
       </div>
 
@@ -227,55 +241,61 @@ export function Login({ isSuperRoute = false }: LoginProps) {
           <div className='d-flex flex-stack flex-grow-1'>
             <div className='fw-semibold'>
               <div className='fs-7 text-gray-700'>
-                Use{' '}
-                <span className='fw-bolder text-gray-900'>
-                  {isSuperRoute ? 'admin@myapp.com' : 'admin@sunbeam.com'}
-                </span>{' '}
-                 to sign in as {isSuperRoute ? 'Super Admin' : 'School Staff / Teacher'}
+                {isSuperRoute ? (
+                  <>
+                    Use <span className='fw-bolder text-gray-900'>superadmin866@gmail.com</span> with password <span className='fw-bolder text-gray-900'>Samar@8318520053</span> to sign in as Super Admin.
+                  </>
+                ) : (
+                  <>
+                    Select your Company and enter credentials (e.g., <span className='fw-bolder text-gray-900'>john@acme.com</span> / <span className='fw-bolder text-gray-900'>johnpassword</span>)
+                  </>
+                )}
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── School Selector (School Admin only) ── */}
+      {/* ── Company Selector (Tenant Admin only) ── */}
       {loginType === 'admin' && (
         <div className='fv-row mb-8'>
           <label className='form-label fs-6 fw-bold text-gray-900 required'>
-            Select School
+            Select Company
           </label>
           <AsyncSelect
             cacheOptions
             defaultOptions
-            loadOptions={loadSchoolOptions}
-            placeholder='Search school by name or code...'
-            value={formik.values.schoolId ? {
-              value: formik.values.schoolId,
-              label: selectedSchoolName || '',
-              logo: selectedSchoolLogo,
-              name: selectedSchoolName
+            loadOptions={loadCompanyOptions}
+            placeholder='Search company by name or subdomain...'
+            value={formik.values.companyId ? {
+              value: formik.values.companyId,
+              label: selectedCompanyName || '',
+              logo: selectedCompanyLogo,
+              name: selectedCompanyName,
+              subdomain: savedCompany?.subdomain
             } : null}
             onChange={(option: any) => {
               if (option) {
-                formik.setFieldValue('schoolId', option.value.toString())
-                setSelectedSchoolLogo(option.logo || null)
-                setSelectedSchoolName(option.name || null)
-                localStorage.setItem('selected_school', JSON.stringify({
+                formik.setFieldValue('companyId', option.value.toString())
+                setSelectedCompanyLogo(option.logo || null)
+                setSelectedCompanyName(option.name || null)
+                localStorage.setItem('selected_company', JSON.stringify({
                   id: option.value.toString(),
                   logo: option.logo || null,
-                  name: option.name || null
+                  name: option.name || null,
+                  subdomain: option.subdomain
                 }))
               } else {
-                formik.setFieldValue('schoolId', '')
-                setSelectedSchoolLogo(null)
-                setSelectedSchoolName(null)
-                localStorage.removeItem('selected_school')
+                formik.setFieldValue('companyId', '')
+                setSelectedCompanyLogo(null)
+                setSelectedCompanyName(null)
+                localStorage.removeItem('selected_company')
               }
             }}
-            onBlur={() => formik.setFieldTouched('schoolId', true)}
+            onBlur={() => formik.setFieldTouched('companyId', true)}
             styles={selectStyles}
           />
-          {formik.touched.schoolId && formik.errors.schoolId && (
+          {formik.touched.companyId && formik.errors.companyId && (
             <div className='fv-plugins-message-container mt-2'>
               <div className='fv-help-block d-flex align-items-center gap-1'>
                 <i className='ki-duotone ki-information-5 fs-6 text-danger'>
@@ -284,7 +304,7 @@ export function Login({ isSuperRoute = false }: LoginProps) {
                   <span className='path3'></span>
                 </i>
                 <span role='alert' className='text-danger fw-semibold fs-7'>
-                  {formik.errors.schoolId as string}
+                  {formik.errors.companyId as string}
                 </span>
               </div>
             </div>
@@ -295,12 +315,12 @@ export function Login({ isSuperRoute = false }: LoginProps) {
       {/* ── Email ── */}
       <div className='fv-row mb-8'>
         <label className='form-label fw-bold text-gray-900 fs-6 required'>
-          {loginType === 'super_admin' ? 'Email Address' : 'Email Address / Mobile Number'}
+          Email Address
         </label>
         <div className='position-relative'>
           <input
             type='text'
-            placeholder={loginType === 'super_admin' ? 'Enter your email' : 'Enter email or mobile number'}
+            placeholder='Enter your email'
             autoComplete='off'
             {...formik.getFieldProps('email')}
             className={clsx(
@@ -430,7 +450,7 @@ export function Login({ isSuperRoute = false }: LoginProps) {
       {/* ── Footer note ── */}
       <div className='text-center'>
         <span className='text-muted fw-semibold fs-8 text-uppercase ls-1'>
-          Secure access · EduAdmin portal
+          Secure access · Enterprise Portal
         </span>
       </div>
     </form>

@@ -85,188 +85,16 @@ export interface UserModel {
   }
 }
 
-export interface SchoolModel {
-  id: number
-  code: string
-  name: string
-  subdomain: string
-  institution_type?: 'SCHOOL' | 'COLLEGE' | 'COACHING' | string
-  is_area_wise?: boolean
-  db_host?: string
-  db_port?: number
-  db_username?: string
-  db_password?: string
-  schema?: string
-  database?: string
-  app_url?: string
-  is_active: boolean
-  setup_completed: boolean
-  createdAt?: string
-  principalName?: string
-  phone?: string
-  email?: string
-  address?: string
-  logoPath?: string
-  bannerPath?: string
-  establishedYear?: string | number
-  gemini_api_key?: string
-  openai_api_key?: string
-  grok_api_key?: string
-  latitude?: string | number
-  interview_questions?: boolean
-  interview_schedule?: boolean
-  certifications?: boolean
-  longitude?: string | number
-  geofence_radius?: string | number
-  enable_geofence?: boolean
-}
-
-export interface SchoolCreationData {
-  code: string
-  name: string
-  subdomain: string
-  institution_type?: 'SCHOOL' | 'COLLEGE' | 'COACHING' | string
-  is_area_wise?: boolean
-  db_name: string
-  db_host: string
-  db_port: number
-  db_username: string
-  db_password: string
-  address: string
-  phone: string
-  email: string
-  logoPath?: string
-  gemini_api_key?: string
-  openai_api_key?: string
-  grok_api_key?: string
-  latitude?: string | number
-  longitude?: string | number
-  geofence_radius?: string | number
-  enable_geofence?: boolean
-}
-
-export interface SchoolResponse {
-  success: boolean
-  message: string
-  data: {
-    school: SchoolModel
-  }
-}
-
 export interface LoginResponse {
   success: boolean
   message: string
-  data: {
-    token: string
+  token: string
+  user?: UserModel
+  admin?: UserModel
+  linkedStudents?: UserModel[]
+  data?: {
     user?: UserModel
     admin?: UserModel
-    student?: UserModel
-    parent?: UserModel
-    linkedStudents?: UserModel[]
-  }
-}
-
-export interface SchoolsListResponse {
-  success: boolean
-  message: string
-  data: {
-    schools: SchoolModel[]
-  }
-  pagination: {
-    total: number
-    page: number
-    limit: number
-    totalPages: number
-    hasNextPage: boolean
-    hasPrevPage: boolean
-  }
-}
-
-export interface ProfessionModel {
-  id: number
-  name: string
-  description?: string
-  category: "teaching" | "administrative" | "support" | "technical" | "other" | string
-  is_active: boolean
-  created_by?: number | null
-  createdAt?: string
-  updatedAt?: string
-}
-
-export interface ProfessionCreationData {
-  name: string
-  description?: string
-  category: string
-  is_active?: boolean
-}
-
-export interface ProfessionResponse {
-  success: boolean
-  message: string
-  data: {
-    profession?: ProfessionModel
-  }
-}
-
-export interface ProfessionsListResponse {
-  success: boolean
-  message: string
-  data: {
-    professions: ProfessionModel[]
-  }
-  pagination?: {
-    total: number
-    page: number
-    limit: number
-    totalPages: number
-    hasNextPage: boolean
-    hasPrevPage: boolean
-  }
-}
-
-export interface StaffModel {
-  id: number
-  name: string
-  email: string
-  role: string
-  is_active: boolean
-  profession_id?: number | null
-  createdAt?: string
-  updatedAt?: string
-  permissions?: string[]
-}
-
-export interface StaffCreationData {
-  name: string
-  email: string
-  password?: string
-  role: string
-  profession_id?: number
-  is_active?: boolean
-}
-
-export interface StaffResponse {
-  success: boolean
-  message: string
-  data: {
-    staff?: StaffModel
-    admin?: StaffModel
-  }
-}
-
-export interface StaffListResponse {
-  success: boolean
-  message: string
-  data: {
-    staff: StaffModel[]
-  }
-  pagination?: {
-    total: number
-    page: number
-    limit: number
-    totalPages: number
-    hasNextPage: boolean
-    hasPrevPage: boolean
   }
 }
 
@@ -334,3 +162,39 @@ export interface AIBlogGenerationResponse {
     keywords: string
   }
 }
+
+export interface TenantModel {
+  id: number
+  name: string
+  subdomain: string
+  schema_name?: string
+  is_active?: boolean
+  settings?: any
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface TenantCreationData {
+  name: string
+  subdomain: string
+  settings?: any
+  adminName?: string
+  adminEmail?: string
+  adminPassword?: string
+  logo?: string
+}
+
+export interface DocumentModel {
+  id: number
+  title: string
+  content?: string
+  created_by_id?: number
+  createdAt?: string
+  updatedAt?: string
+  creator?: {
+    id: number
+    name: string
+    email: string
+  }
+}
+

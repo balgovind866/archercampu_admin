@@ -57,16 +57,16 @@ const AuthProvider: FC<WithChildren> = ({ children }) => {
     }
   })
 
-  // ── Dynamic tab title + favicon based on logged-in school ──
+  // ── Dynamic tab title + favicon based on logged-in company ──
   useEffect(() => {
-    const defaultTitle = 'apnacampus - School Management Portal'
+    const defaultTitle = 'apnacampus - Company Portal'
     const defaultFavicon = '/media/logos/apnacampus-favicon.svg'
 
     if (currentUser?.school_name) {
-      // School admin logged in — show school name
+      // Company admin logged in — show company name
       document.title = `${currentUser.school_name} | apnacampus`
 
-      // Update favicon to school logo if available, else keep apnacampus favicon
+      // Update favicon to company logo if available, else keep apnacampus favicon
       const faviconHref = currentUser.school_logo || defaultFavicon
       updateFavicon(faviconHref)
     } else if (currentUser?.role === 'super_admin') {
@@ -103,7 +103,7 @@ const AuthProvider: FC<WithChildren> = ({ children }) => {
       localStorage.removeItem('kt-auth-linked-students')
       localStorage.removeItem('kt-auth-selected-student')
       localStorage.removeItem('kt-auth-selected-student-id')
-      localStorage.removeItem('selected_school')
+      localStorage.removeItem('selected_company')
     }
   }
 
@@ -151,24 +151,9 @@ const AuthInit: FC<WithChildren> = ({ children }) => {
         if (!currentUser) {
           const { data: response } = await getUserByToken(apiToken)
           if (response && response.success && response.data) {
-            const user = response.data.user || response.data.admin || response.data.parent || (response.data.student ? { ...response.data.student, role: 'student' } : undefined)
+            const user = response.data.user || response.data.admin
             if (user) {
               setCurrentUser(user)
-              if (response.data.linkedStudents) {
-                setLinkedStudents(response.data.linkedStudents)
-                localStorage.setItem('kt-auth-linked-students', JSON.stringify(response.data.linkedStudents))
-                
-                const storedSelected = localStorage.getItem('kt-auth-selected-student')
-                let currentSel = storedSelected ? JSON.parse(storedSelected) : null
-                if (!currentSel || !response.data.linkedStudents.find((s: UserModel) => s.id === currentSel.id)) {
-                  if (response.data.linkedStudents.length > 0) {
-                    const defaultStudent = response.data.linkedStudents[0]
-                    setSelectedStudent(defaultStudent)
-                    localStorage.setItem('kt-auth-selected-student', JSON.stringify(defaultStudent))
-                    localStorage.setItem('kt-auth-selected-student-id', defaultStudent.id.toString())
-                  }
-                }
-              }
             } else {
               logout()
             }

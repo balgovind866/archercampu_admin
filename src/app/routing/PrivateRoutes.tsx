@@ -6,6 +6,9 @@ import { DashboardWrapper } from '../pages/dashboard/DashboardWrapper'
 import { getCSSVariableValue } from '../../_metronic/assets/ts/_utils'
 import { WithChildren } from '../../_metronic/helpers'
 import { useAuth } from '../modules/auth'
+import { TenantsPageWrapper } from '../modules/tenants/TenantsPage'
+import { DocumentsPageWrapper } from '../modules/documents/DocumentsPage'
+import { ProfilePageWrapper } from '../modules/settings/ProfilePage'
 
 const PrivateRoutes = () => {
   const { currentUser } = useAuth();
@@ -14,13 +17,21 @@ const PrivateRoutes = () => {
   return (
     <Routes>
       <Route element={<MasterLayout />}>
-        {/* Redirect to dashboard after login */}
-        <Route path='auth/*' element={<Navigate to='/dashboard' />} />
+        {/* Redirect to dashboard or tenants after login */}
+        <Route path='auth/*' element={<Navigate to={isSuperAdmin ? '/tenants' : '/dashboard'} />} />
 
         <Route
           path='dashboard'
           element={<DashboardWrapper />}
         />
+
+        {isSuperAdmin ? (
+          <Route path='tenants' element={<TenantsPageWrapper />} />
+        ) : (
+          <Route path='documents' element={<DocumentsPageWrapper />} />
+        )}
+
+        <Route path='settings/profile' element={<ProfilePageWrapper />} />
 
         {/* Page Not Found Fallback */}
         <Route path='*' element={<Navigate to='/error/404' />} />

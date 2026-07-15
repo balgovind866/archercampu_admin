@@ -57,9 +57,17 @@ export function setupAxios(axios: any) {
         config.headers.Authorization = `Bearer ${auth.api_token}`
       }
 
-      const selectedStudentId = localStorage.getItem('kt-auth-selected-student-id')
-      if (selectedStudentId) {
-        config.headers['X-Selected-Student-Id'] = selectedStudentId
+      // Automatically attach x-tenant-subdomain header for multi-tenant isolation
+      const selectedCompany = localStorage.getItem('selected_company')
+      if (selectedCompany) {
+        try {
+          const company = JSON.parse(selectedCompany)
+          if (company && company.subdomain) {
+            config.headers['x-tenant-subdomain'] = company.subdomain
+          }
+        } catch (e) {
+          console.error('Failed to parse selected company for tenant headers', e)
+        }
       }
 
       return config
